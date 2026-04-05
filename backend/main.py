@@ -1,0 +1,20 @@
+from fastapi import FastAPI, File, UploadFile
+import uvicorn
+from routes import document_route
+
+
+app = FastAPI(title = "RAG Pipeline API")
+
+@app.get("/health")
+def health_check():
+    return {"status" : "Healthy"}
+
+
+app.include_router(document_route.router)
+
+
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
