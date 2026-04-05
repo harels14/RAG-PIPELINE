@@ -1,12 +1,14 @@
 from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
+from fastapi.concurrency import run_in_threadpool
 import os
 
 class VectorStore:
     def __init__(self):
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
-        self.connection_string = os.getenv("DATABASE_URL")
+        db_url = os.getenv("DATABASE_URL", "")
+        self.connection_string = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
         self.collection_name = "pdf_documents"
 
     def get_vector_store(self):
@@ -19,4 +21,4 @@ class VectorStore:
     
     async def save_documents(self, chunks):
         vector_store = self.get_vector_store()
-        await vector_store.aadd_documents(chunks)
+        await run_in_threadpool(vector_store.add_documents, chunks)
