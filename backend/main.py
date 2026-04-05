@@ -1,6 +1,6 @@
 from fastapi import FastAPI, File, UploadFile
 import uvicorn
-from routes import document_route
+from routes import document_route, user_route
 
 
 app = FastAPI(title = "RAG Pipeline API")
@@ -11,6 +11,7 @@ def health_check():
 
 
 app.include_router(document_route.router)
+app.include_router(user_route.router)
 
 
 
