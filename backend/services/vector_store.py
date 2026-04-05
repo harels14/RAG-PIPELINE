@@ -16,7 +16,6 @@ class VectorStore:
             connection=self.connection_string,
             embeddings=self.embeddings,
             collection_name=self.collection_name,
-            use_jsonb=True 
         )
     
     async def save_documents(self, chunks):
