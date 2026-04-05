@@ -19,4 +19,4 @@ class VectorStore:
     
     async def save_documents(self, chunks):
         vector_store = self.get_vector_store()
-        await vector_store.add_documents(chunks)
+        await vector_store.aadd_documents(chunks)
