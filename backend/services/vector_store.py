@@ -5,19 +5,13 @@ import os
 
 class VectorStore:
     def __init__(self):
-        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
         db_url = os.getenv("DATABASE_URL", "")
-        self.connection_string = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
-        self.collection_name = "pdf_documents"
-
-    def get_vector_store(self):
-        return PGVector(
-            connection=self.connection_string,
-            embeddings=self.embeddings,
-            collection_name=self.collection_name,
+        connection_string = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        self.vector_store = PGVector(
+            connection=connection_string,
+            embeddings=OpenAIEmbeddings(model="text-embedding-3-small"),
+            collection_name="pdf_documents",
         )
-    
+
     async def save_documents(self, chunks):
-        vector_store = self.get_vector_store()
-        await run_in_threadpool(vector_store.add_documents, chunks)
+        await run_in_threadpool(self.vector_store.add_documents, chunks)
