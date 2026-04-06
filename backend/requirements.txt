@@ -11,4 +11,4 @@ python-dotenv
 pypdf
 pdfplumber
 cryptography
-passlib[bcrypt]
+bcrypt
