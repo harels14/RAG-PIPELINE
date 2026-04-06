@@ -12,9 +12,8 @@ class RAGService:
             collection_name="pdf_documents",
         )
 
-    def query(self, userid: str, question: str):
+    def get_relevant_docs(self, userid: str, question: str):
         retriever = self.vector_store.as_retriever(
             search_kwargs={"filter": {"user_id": userid}, "k": 5}
         )
-        docs = retriever.invoke(question)
-        return docs
+        return retriever.invoke(question)
