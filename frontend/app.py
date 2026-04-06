@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import websocket
 import json
+from urllib.parse import quote
 
 API_URL = "https://rag-pipeline-production-b0b8.up.railway.app"
 WS_URL = "wss://rag-pipeline-production-b0b8.up.railway.app/rag/ws"
@@ -57,7 +58,7 @@ with st.sidebar:
             col1, col2 = st.columns([4, 1])
             col1.caption(f)
             if col2.button("🗑️", key=f):
-                requests.delete(f"{API_URL}/users/{user_id}/files/{f}")
+                requests.delete(f"{API_URL}/users/{user_id}/files/{quote(f)}")
                 st.rerun()
     else:
         st.caption("No files uploaded yet")

@@ -21,7 +21,14 @@ class VectorStore:
         self._get_store().add_documents(chunks)
 
     def _sync_delete(self, userid: str, file_name: str):
-        self._get_store().delete(filter={"user_id": userid, "file_name": file_name})
+        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    DELETE FROM langchain_pg_embedding
+                    WHERE cmetadata->>'user_id' = %s
+                    AND cmetadata->>'file_name' = %s
+                """, (userid, file_name))
+            conn.commit()
 
     async def save_documents(self, chunks):
         await run_in_threadpool(self._sync_save, chunks)
