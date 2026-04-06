@@ -34,13 +34,13 @@ class PDFProcessor():
 
     def _parse_pdf(self, file_path: str, userid: str, file_name: str):
         t0 = time.perf_counter()
-        doc = fitz.open(file_path)
         pages = []
-        for i, page in enumerate(doc):
-            text = page.get_text()
-            for table in page.find_tables().tables:
-                text += "\n" + "\n".join(" | ".join(str(c or "") for c in row) for row in table.extract())
-            pages.append(Document(page_content=text, metadata={"page": i, "source": file_path}))
+        with fitz.open(file_path) as doc:
+            for i, page in enumerate(doc):
+                text = page.get_text()
+                for table in page.find_tables().tables:
+                    text += "\n" + "\n".join(" | ".join(str(c or "") for c in row) for row in table.extract())
+                pages.append(Document(page_content=text, metadata={"page": i, "source": file_path}))
         logger.info(f"[{file_name}] pymupdf parse: {time.perf_counter() - t0:.2f}s ({len(pages)} pages)")
 
         t1 = time.perf_counter()
