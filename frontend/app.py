@@ -9,6 +9,11 @@ WS_URL = "wss://rag-pipeline-production-b0b8.up.railway.app/rag/ws"
 
 st.set_page_config(page_title="Siemens AI Assistant", page_icon="🏢", layout="centered")
 
+@st.cache_data(ttl=10)
+def fetch_files(user_id):
+    resp = requests.get(f"{API_URL}/users/{user_id}/files")
+    return resp.json().get("files", []) if resp.status_code == 200 else []
+
 # --- Auth ---
 params = st.query_params
 user_id = params.get("user_id")
@@ -69,22 +74,23 @@ with st.sidebar:
         st.rerun()
 
     if st.session_state.pending_files:
-        for name, content in st.session_state.pending_files:
-            with st.spinner(f"Uploading {name}..."):
-                resp = requests.post(
-                    f"{API_URL}/documents/upload",
-                    data={"userid": user_id},
-                    files={"file": (name, content, "application/pdf")}
-                )
-            if resp.status_code == 200:
-                st.success(f"{name} — {resp.json()['stats']['chunks_created']} chunks")
-            else:
-                st.error(f"{name} — Upload failed")
+        with st.spinner(f"Uploading {len(st.session_state.pending_files)} file(s) in parallel..."):
+            resp = requests.post(
+                f"{API_URL}/documents/upload-batch",
+                data={"userid": user_id},
+                files=[("files", (name, content, "application/pdf")) for name, content in st.session_state.pending_files]
+            )
+        if resp.status_code == 200:
+            for r in resp.json()["results"]:
+                st.success(f"{r['file']} — {r['chunks_created']} chunks")
+            fetch_files.clear()
+        else:
+            st.error("Upload failed")
         st.session_state.pending_files = []
+
     st.divider()
     st.subheader("Uploaded Files")
-    files_resp = requests.get(f"{API_URL}/users/{user_id}/files")
-    files = files_resp.json().get("files", []) if files_resp.status_code == 200 else []
+    files = fetch_files(user_id)
     if files:
         for f in files:
             col1, col2 = st.columns([4, 1])
@@ -92,6 +98,7 @@ with st.sidebar:
             if col2.button("🗑️", key=f):
                 with st.spinner():
                     requests.delete(f"{API_URL}/users/{user_id}/files/{quote(f)}")
+                fetch_files.clear()
                 st.rerun()
     else:
         st.caption("No files uploaded yet")

@@ -2,7 +2,11 @@ from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
 from fastapi.concurrency import run_in_threadpool
 import psycopg2
+import logging
+import time
 import os
+
+logger = logging.getLogger(__name__)
 
 class VectorStore:
     def __init__(self):
@@ -18,7 +22,13 @@ class VectorStore:
         )
 
     def _sync_save(self, chunks):
-        self._get_store().add_documents(chunks)
+        t0 = time.perf_counter()
+        store = self._get_store()
+        logger.info(f"PGVector init: {time.perf_counter() - t0:.2f}s")
+
+        t1 = time.perf_counter()
+        store.add_documents(chunks)
+        logger.info(f"embeddings + DB insert ({len(chunks)} chunks): {time.perf_counter() - t1:.2f}s | total save: {time.perf_counter() - t0:.2f}s")
 
     def _sync_delete(self, userid: str, file_name: str):
         with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
@@ -30,9 +40,6 @@ class VectorStore:
                 """, (userid, file_name))
             conn.commit()
 
-    async def save_documents(self, chunks):
-        await run_in_threadpool(self._sync_save, chunks)
-
     def _sync_get_files(self, userid: str) -> list[str]:
         with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
             with conn.cursor() as cur:
@@ -42,6 +49,9 @@ class VectorStore:
                     WHERE cmetadata->>'user_id' = %s
                 """, (userid,))
                 return [row[0] for row in cur.fetchall()]
+
+    async def save_documents(self, chunks):
+        await run_in_threadpool(self._sync_save, chunks)
 
     async def delete_file(self, userid: str, file_name: str):
         await run_in_threadpool(self._sync_delete, userid, file_name)
