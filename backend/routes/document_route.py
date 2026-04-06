@@ -16,18 +16,10 @@ async def add_document(userid: str = Form(...), file: UploadFile = File(...)):
 
 @router.post("/upload-batch")
 async def upload_batch(userid: str = Form(...), files: list[UploadFile] = File(...)):
-    all_chunks_per_file = await asyncio.gather(*[
-        pdf_service.process_upload(f, userid) for f in files
-    ])
+    async def process_one(file: UploadFile):
+        chunks = await pdf_service.process_upload(file, userid)
+        await vector_service.save_documents(chunks)
+        return {"file": file.filename, "chunks_created": len(chunks)}
 
-    all_chunks = [chunk for chunks in all_chunks_per_file for chunk in chunks]
-    await vector_service.save_documents(all_chunks)
-
-    return {
-        "status": "success",
-        "results": [{"file": f.filename, "chunks_created": len(c)} for f, c in zip(files, all_chunks_per_file)]
-    }
-
-
-
-
+    results = await asyncio.gather(*[process_one(f) for f in files])
+    return {"status": "success", "results": list(results)}
