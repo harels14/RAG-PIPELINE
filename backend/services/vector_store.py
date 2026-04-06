@@ -53,8 +53,17 @@ class VectorStore:
     async def save_documents(self, chunks):
         await run_in_threadpool(self._sync_save, chunks)
 
+    def _sync_delete_all(self, userid: str):
+        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM langchain_pg_embedding WHERE cmetadata->>'user_id' = %s", (userid,))
+            conn.commit()
+
     async def delete_file(self, userid: str, file_name: str):
         await run_in_threadpool(self._sync_delete, userid, file_name)
+
+    async def delete_all_files(self, userid: str):
+        await run_in_threadpool(self._sync_delete_all, userid)
 
     async def get_user_files(self, userid: str) -> list[str]:
         return await run_in_threadpool(self._sync_get_files, userid)

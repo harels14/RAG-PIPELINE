@@ -40,3 +40,8 @@ async def get_files(user_id: str):
 async def delete_file(user_id: str, file_name: str):
     await vector_service.delete_file(user_id, file_name)
     return {"status": "deleted", "file_name": file_name}
+
+@router.delete("/{user_id}/files")
+async def delete_all_files(user_id: str):
+    await vector_service.delete_all_files(user_id)
+    return {"status": "deleted"}

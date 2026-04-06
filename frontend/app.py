@@ -100,6 +100,11 @@ with st.sidebar:
                     requests.delete(f"{API_URL}/users/{user_id}/files/{quote(f)}")
                 fetch_files.clear()
                 st.rerun()
+        if st.button("🗑️ Delete All", use_container_width=True):
+            with st.spinner():
+                requests.delete(f"{API_URL}/users/{user_id}/files")
+            fetch_files.clear()
+            st.rerun()
     else:
         st.caption("No files uploaded yet")
     st.divider()
