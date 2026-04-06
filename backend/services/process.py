@@ -4,9 +4,9 @@ import time
 import logging
 from fastapi import UploadFile
 from fastapi.concurrency import run_in_threadpool
-from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-import pdfplumber
+from langchain_core.documents import Document
+import fitz
 
 logger = logging.getLogger(__name__)
 
@@ -32,32 +32,16 @@ class PDFProcessor():
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
-    def _extract_tables(self, file_path: str, file_name: str) -> dict[int, str]:
-        t0 = time.perf_counter()
-        tables_by_page = {}
-        with pdfplumber.open(file_path) as pdf:
-            for i, page in enumerate(pdf.pages):
-                tables = page.extract_tables()
-                if tables:
-                    table_text = ""
-                    for table in tables:
-                        for row in table:
-                            table_text += " | ".join(cell or "" for cell in row) + "\n"
-                    tables_by_page[i] = table_text
-        logger.info(f"[{file_name}] pdfplumber table extraction: {time.perf_counter() - t0:.2f}s ({len(tables_by_page)} pages with tables)")
-        return tables_by_page
-
     def _parse_pdf(self, file_path: str, userid: str, file_name: str):
         t0 = time.perf_counter()
-        loader = PyPDFLoader(file_path)
-        pages = loader.load()
-        logger.info(f"[{file_name}] PyPDFLoader: {time.perf_counter() - t0:.2f}s ({len(pages)} pages)")
-
-        tables_by_page = self._extract_tables(file_path, file_name)
-
-        for i, page in enumerate(pages):
-            if i in tables_by_page:
-                page.page_content += "\n" + tables_by_page[i]
+        doc = fitz.open(file_path)
+        pages = []
+        for i, page in enumerate(doc):
+            text = page.get_text()
+            for table in page.find_tables().tables:
+                text += "\n" + "\n".join(" | ".join(str(c or "") for c in row) for row in table.extract())
+            pages.append(Document(page_content=text, metadata={"page": i, "source": file_path}))
+        logger.info(f"[{file_name}] pymupdf parse: {time.perf_counter() - t0:.2f}s ({len(pages)} pages)")
 
         t1 = time.perf_counter()
         chunks = self.splitter.split_documents(pages)

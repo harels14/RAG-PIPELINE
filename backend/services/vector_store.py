@@ -13,22 +13,18 @@ class VectorStore:
         db_url = os.getenv("DATABASE_URL", "")
         self.connection_string = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
         self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-
-    def _get_store(self):
-        return PGVector(
+        t0 = time.perf_counter()
+        self._store = PGVector(
             connection=self.connection_string,
             embeddings=self.embeddings,
             collection_name="pdf_documents",
         )
+        logger.info(f"PGVector init: {time.perf_counter() - t0:.2f}s")
 
     def _sync_save(self, chunks):
         t0 = time.perf_counter()
-        store = self._get_store()
-        logger.info(f"PGVector init: {time.perf_counter() - t0:.2f}s")
-
-        t1 = time.perf_counter()
-        store.add_documents(chunks)
-        logger.info(f"embeddings + DB insert ({len(chunks)} chunks): {time.perf_counter() - t1:.2f}s | total save: {time.perf_counter() - t0:.2f}s")
+        self._store.add_documents(chunks)
+        logger.info(f"embeddings + DB insert ({len(chunks)} chunks): {time.perf_counter() - t0:.2f}s")
 
     def _sync_delete(self, userid: str, file_name: str):
         with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:

@@ -8,7 +8,6 @@ langchain-openai
 langchain-postgres
 psycopg2-binary
 python-dotenv
-pypdf
-pdfplumber
+pymupdf
 cryptography
 bcrypt
