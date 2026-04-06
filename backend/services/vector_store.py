@@ -1,6 +1,7 @@
 from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
 from fastapi.concurrency import run_in_threadpool
+import psycopg2
 import os
 
 class VectorStore:
@@ -25,5 +26,18 @@ class VectorStore:
     async def save_documents(self, chunks):
         await run_in_threadpool(self._sync_save, chunks)
 
+    def _sync_get_files(self, userid: str) -> list[str]:
+        with psycopg2.connect(os.getenv("DATABASE_URL")) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT DISTINCT cmetadata->>'file_name'
+                    FROM langchain_pg_embedding
+                    WHERE cmetadata->>'user_id' = %s
+                """, (userid,))
+                return [row[0] for row in cur.fetchall()]
+
     async def delete_file(self, userid: str, file_name: str):
         await run_in_threadpool(self._sync_delete, userid, file_name)
+
+    async def get_user_files(self, userid: str) -> list[str]:
+        return await run_in_threadpool(self._sync_get_files, userid)

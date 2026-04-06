@@ -9,4 +9,5 @@ langchain-postgres
 psycopg2-binary
 python-dotenv
 pypdf
+pdfplumber
 cryptography
