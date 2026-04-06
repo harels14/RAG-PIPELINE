@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
 import os
 
-_db_url = os.getenv("DATABASE_URL", "").replace("postgresql://", "postgresql+asyncpg://", 1)
+_db_url = os.getenv("DATABASE_URL", "").replace("postgresql://", "postgresql+psycopg://", 1)
 _engine = create_async_engine(_db_url, pool_size=5, max_overflow=10)
 
 class VectorStore:

@@ -7,7 +7,7 @@ langchain-community
 langchain-openai
 langchain-postgres
 psycopg2-binary
-asyncpg
+psycopg[binary]
 python-dotenv
 pymupdf
 cryptography
