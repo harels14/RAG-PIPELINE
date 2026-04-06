@@ -15,17 +15,36 @@ user_id = params.get("user_id")
 
 if not user_id:
     st.title("Siemens AI Assistant")
-    st.subheader("Sign In")
-    entered_id = st.text_input("Enter your User ID")
-    if st.button("Sign In") and entered_id:
-        st.query_params["user_id"] = entered_id
-        st.rerun()
-    st.divider()
-    if st.button("New user — Create User ID"):
-        resp = requests.post(f"{API_URL}/users/register")
-        new_id = resp.json()["user_id"]
-        st.query_params["user_id"] = new_id
-        st.rerun()
+    tab_login, tab_register = st.tabs(["Sign In", "Register"])
+
+    with tab_login:
+        login_id = st.text_input("User ID", key="login_id")
+        login_pass = st.text_input("Password", type="password", key="login_pass")
+        if st.button("Sign In"):
+            resp = requests.post(f"{API_URL}/users/login", data={"user_id": login_id, "password": login_pass})
+            if resp.status_code == 200:
+                st.query_params["user_id"] = login_id
+                st.rerun()
+            else:
+                st.error("Invalid user ID or password")
+
+    with tab_register:
+        reg_pass = st.text_input("Choose a password", type="password", key="reg_pass")
+        reg_pass2 = st.text_input("Confirm password", type="password", key="reg_pass2")
+        if st.button("Create Account"):
+            if reg_pass != reg_pass2:
+                st.error("Passwords do not match")
+            elif not reg_pass:
+                st.error("Password cannot be empty")
+            else:
+                resp = requests.post(f"{API_URL}/users/register", data={"password": reg_pass})
+                if resp.status_code == 200:
+                    new_id = resp.json()["user_id"]
+                    st.success(f"Your User ID: `{new_id}`")
+                    st.info("Save this ID — you will need it to sign in next time")
+                    st.query_params["user_id"] = new_id
+                else:
+                    st.error("Registration failed")
     st.stop()
 
 # --- Sidebar ---
@@ -37,18 +56,31 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.subheader("Upload PDF")
-    uploaded_file = st.file_uploader("Choose a file", type="pdf")
-    if uploaded_file and st.button("Upload"):
-        with st.spinner("Uploading..."):
-            resp = requests.post(
-                f"{API_URL}/documents/upload",
-                data={"userid": user_id},
-                files={"file": uploaded_file}
-            )
-        if resp.status_code == 200:
-            st.success(f"Uploaded {resp.json()['stats']['chunks_created']} chunks")
-        else:
-            st.error("Upload failed")
+    if "uploader_key" not in st.session_state:
+        st.session_state.uploader_key = 0
+    if "pending_files" not in st.session_state:
+        st.session_state.pending_files = []
+
+    uploaded_files = st.file_uploader("Choose files", type="pdf", accept_multiple_files=True, key=st.session_state.uploader_key)
+
+    if uploaded_files and st.button("Upload"):
+        st.session_state.pending_files = [(f.name, f.read()) for f in uploaded_files]
+        st.session_state.uploader_key += 1
+        st.rerun()
+
+    if st.session_state.pending_files:
+        for name, content in st.session_state.pending_files:
+            with st.spinner(f"Uploading {name}..."):
+                resp = requests.post(
+                    f"{API_URL}/documents/upload",
+                    data={"userid": user_id},
+                    files={"file": (name, content, "application/pdf")}
+                )
+            if resp.status_code == 200:
+                st.success(f"{name} — {resp.json()['stats']['chunks_created']} chunks")
+            else:
+                st.error(f"{name} — Upload failed")
+        st.session_state.pending_files = []
     st.divider()
     st.subheader("Uploaded Files")
     files_resp = requests.get(f"{API_URL}/users/{user_id}/files")
@@ -58,7 +90,8 @@ with st.sidebar:
             col1, col2 = st.columns([4, 1])
             col1.caption(f)
             if col2.button("🗑️", key=f):
-                requests.delete(f"{API_URL}/users/{user_id}/files/{quote(f)}")
+                with st.spinner():
+                    requests.delete(f"{API_URL}/users/{user_id}/files/{quote(f)}")
                 st.rerun()
     else:
         st.caption("No files uploaded yet")
@@ -68,7 +101,7 @@ with st.sidebar:
         st.rerun()
 
 # --- Chat ---
-st.title("Siemens AI Assistant")
+st.markdown("<h1 style='text-align: center;'>Siemens AI Assistant</h1>", unsafe_allow_html=True)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
