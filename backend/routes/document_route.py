@@ -1,7 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Form
 from services.process import PDFProcessor
 from services.vector_store import VectorStore
-
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
 pdf_service = PDFProcessor()
