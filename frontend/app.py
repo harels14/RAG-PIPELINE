@@ -4,6 +4,7 @@ import websocket
 import json
 from urllib.parse import quote
 
+#streamlit url - https://rag-pipeline-harel.streamlit.app/?user_id=75f21fc3-9c71-441e-8ce0-1eb7d18cb335
 API_URL = "https://rag-pipeline-production-b0b8.up.railway.app"
 WS_URL = "wss://rag-pipeline-production-b0b8.up.railway.app/rag/ws"
 

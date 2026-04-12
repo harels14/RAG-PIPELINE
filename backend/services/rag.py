@@ -51,7 +51,7 @@ class RAGService:
         fts_docs = self._get_fts_docs(userid, question, k=k)
 
         if not fts_docs:
-            logger.debug("FTS returned no results — using semantic only")
+            logger.debug("FTS returned no results - using semantic only")
             return semantic_docs
 
         return self._reciprocal_rank_fusion([semantic_docs, fts_docs], top_k=k)

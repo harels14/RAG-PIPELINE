@@ -49,7 +49,12 @@ class EvaluationService:
     ) -> dict:
         try:
             from ragas import evaluate
-            from ragas.metrics import faithfulness, answer_relevancy, context_precision
+            from ragas.metrics import (
+                faithfulness,
+                answer_relevancy,
+                LLMContextPrecisionWithoutReference,
+                context_precision,
+            )
             from datasets import Dataset
         except ImportError as e:
             raise RuntimeError(
@@ -69,15 +74,17 @@ class EvaluationService:
             answer = self._generate_answer(docs, question)
             row = {"question": question, "answer": answer, "contexts": [d.page_content for d in docs]}
             if ground_truths:
-                row["ground_truth"] = ground_truths[i]
+                row["reference"] = ground_truths[i]
             rows.append(row)
             logger.info("Evaluated question %d/%d", i + 1, len(questions))
 
         dataset = Dataset.from_list(rows)
-        metrics = [faithfulness, answer_relevancy, context_precision]
+
         if ground_truths:
             from ragas.metrics import context_recall, answer_correctness
-            metrics += [context_recall, answer_correctness]
+            metrics = [faithfulness, answer_relevancy, context_precision, context_recall, answer_correctness]
+        else:
+            metrics = [faithfulness, answer_relevancy, LLMContextPrecisionWithoutReference]
 
         result = evaluate(dataset, metrics=metrics)
         scores = result.to_pandas()
