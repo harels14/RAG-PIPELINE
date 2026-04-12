@@ -17,9 +17,9 @@ def _parse_pdf_page_batch(content: bytes, userid: str, file_name: str, start: in
     pages = []
     with fitz.open(stream=content, filetype="pdf") as doc:
         for i in range(start, min(end, len(doc))):
-            text = doc[i].get_text()
+            text = doc[i].get_text().replace('\x00', '')
             for table in doc[i].find_tables().tables:
-                text += "\n" + "\n".join(" | ".join(str(c or "") for c in row) for row in table.extract())
+                text += "\n" + "\n".join(" | ".join(str(c or "").replace('\x00', '') for c in row) for row in table.extract())
             pages.append(Document(page_content=text, metadata={"page": i, "source": file_name}))
     chunks = splitter.split_documents(pages)
     for chunk in chunks:

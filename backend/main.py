@@ -1,4 +1,6 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile
+from fastapi.concurrency import run_in_threadpool
 import uvicorn
 import logging
 from routes import document_route, user_route, rag_route, evaluation_route
@@ -9,7 +11,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 # https://rag-pipeline-production-b0b8.up.railway.app/docs
 
 
-app = FastAPI(title = "RAG Pipeline API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await run_in_threadpool(rag_route.rag_service.ensure_fts_index)
+    yield
+
+
+app = FastAPI(title="RAG Pipeline API", lifespan=lifespan)
 
 @app.get("/health")
 def health_check():

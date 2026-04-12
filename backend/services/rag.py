@@ -1,6 +1,7 @@
 import os
 import logging
 import psycopg2
+import psycopg2.pool
 
 from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
@@ -9,6 +10,15 @@ from langchain_core.documents import Document
 logger = logging.getLogger(__name__)
 
 _DB_URL = os.getenv("DATABASE_URL", "")
+
+_conn_pool: psycopg2.pool.ThreadedConnectionPool | None = None
+
+
+def _get_conn_pool() -> psycopg2.pool.ThreadedConnectionPool:
+    global _conn_pool
+    if _conn_pool is None:
+        _conn_pool = psycopg2.pool.ThreadedConnectionPool(minconn=1, maxconn=10, dsn=_DB_URL)
+    return _conn_pool
 
 
 class RAGService:
@@ -19,7 +29,7 @@ class RAGService:
             embeddings=OpenAIEmbeddings(model="text-embedding-3-small"),
             collection_name="pdf_documents",
         )
-        self._ensure_fts_index()
+        # _ensure_fts_index() is called at app startup via lifespan, not here
 
     # ------------------------------------------------------------------
     # Semantic search (original)
@@ -77,7 +87,8 @@ class RAGService:
             ORDER BY rank DESC
             LIMIT %(k)s
         """
-        conn = psycopg2.connect(_DB_URL)
+        pool = _get_conn_pool()
+        conn = pool.getconn()
         try:
             with conn.cursor() as cur:
                 cur.execute(sql, {"query": query, "uid": userid, "k": k})
@@ -86,7 +97,7 @@ class RAGService:
             logger.warning("FTS query failed: %s", e)
             return []
         finally:
-            conn.close()
+            pool.putconn(conn)
 
         return [Document(page_content=row[0], metadata=row[1]) for row in rows]
 
@@ -114,22 +125,25 @@ class RAGService:
         sorted_docs = sorted(scores.values(), key=lambda x: x["score"], reverse=True)
         return [entry["doc"] for entry in sorted_docs[:top_k]]
 
-    def _ensure_fts_index(self) -> None:
+    def ensure_fts_index(self) -> None:
         """
         Create a GIN index on the document column for fast full-text search.
-        Runs once at startup; safe to call multiple times (IF NOT EXISTS).
+        Called once at app startup via lifespan; safe to call multiple times (IF NOT EXISTS).
         """
         sql = """
             CREATE INDEX IF NOT EXISTS idx_langchain_pg_embedding_fts
             ON langchain_pg_embedding
             USING gin(to_tsvector('english', document))
         """
+        pool = _get_conn_pool()
+        conn = pool.getconn()
         try:
-            conn = psycopg2.connect(_DB_URL)
-            conn.autocommit = True
             with conn.cursor() as cur:
                 cur.execute(sql)
-            conn.close()
+            conn.commit()
             logger.info("FTS GIN index ensured on langchain_pg_embedding")
         except Exception as e:
+            conn.rollback()
             logger.warning("Could not create FTS index (non-fatal): %s", e)
+        finally:
+            pool.putconn(conn)
