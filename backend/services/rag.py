@@ -25,7 +25,7 @@ class RAGService:
     # Semantic search (original)
     # ------------------------------------------------------------------
 
-    def get_relevant_docs(self, userid: str, question: str, k: int = 5) -> list[Document]:
+    def get_relevant_docs(self, userid: str, question: str, k: int = 7) -> list[Document]:
         """Pure vector similarity search."""
         retriever = self.vector_store.as_retriever(
             search_kwargs={"filter": {"user_id": userid}, "k": k}
@@ -37,7 +37,7 @@ class RAGService:
     # ------------------------------------------------------------------
 
     def get_relevant_docs_hybrid(
-        self, userid: str, question: str, k: int = 5
+        self, userid: str, question: str, k: int = 7
     ) -> list[Document]:
         """
         Hybrid retrieval combining:

@@ -13,7 +13,7 @@ _executor = ProcessPoolExecutor(max_workers=4)
 
 
 def _parse_pdf_worker(content: bytes, userid: str, file_name: str):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    splitter = RecursiveCharacterTextSplitter(chunk_size=450, chunk_overlap=50)
     pages = []
     with fitz.open(stream=content, filetype="pdf") as doc:
         for i, page in enumerate(doc):

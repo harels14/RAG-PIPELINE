@@ -2,7 +2,8 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-PROMPT = ChatPromptTemplate.from_template("""Answer the question based only on the context below.
+PROMPT = ChatPromptTemplate.from_template("""Answer the question using the context below.
+If the context doesn't contain enough information, share what you do know from it and state clearly what's missing.
 
 Context:
 {context}
