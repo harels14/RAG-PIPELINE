@@ -50,4 +50,4 @@ class PDFProcessor:
                 _executor, _parse_pdf_page_batch, content, userid, file_name, start, end
             )
             if chunks:
-                yield chunks
+                yield chunks # every time chunks are ready, return chunks and keep listening for more

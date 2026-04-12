@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 
 # https://rag-pipeline-production-b0b8.up.railway.app/docs
 
-
+# runs ensure_fts_index in threadpool so it doesnt block the main thread
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await run_in_threadpool(rag_route.rag_service.ensure_fts_index)
