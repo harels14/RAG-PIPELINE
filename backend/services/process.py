@@ -3,7 +3,7 @@ import time
 import logging
 from concurrent.futures import ProcessPoolExecutor
 from fastapi import UploadFile
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import TokenTextSplitter
 from langchain_core.documents import Document
 import fitz
 
@@ -13,7 +13,7 @@ _executor = ProcessPoolExecutor(max_workers=4)
 
 
 def _parse_pdf_worker(content: bytes, userid: str, file_name: str):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=450, chunk_overlap=50)
+    splitter = TokenTextSplitter(chunk_size=256, chunk_overlap=30, encoding_name="cl100k_base")
     pages = []
     with fitz.open(stream=content, filetype="pdf") as doc:
         for i, page in enumerate(doc):
