@@ -17,9 +17,11 @@ async def rag_websocket(websocket: WebSocket):
             userid = data["userid"]
             question = data["question"]
 
-            docs = await run_in_threadpool(rag_service.get_relevant_docs_hybrid, userid, question)
-
-            async for message in stream_answer(docs, question):
-                await websocket.send_text(json.dumps(message))
+            try:
+                docs = await run_in_threadpool(rag_service.get_relevant_docs_hybrid, userid, question)
+                async for message in stream_answer(docs, question):
+                    await websocket.send_text(json.dumps(message))
+            except Exception as e:
+                await websocket.send_text(json.dumps({"type": "error", "content": str(e)}))
     except WebSocketDisconnect:
         pass

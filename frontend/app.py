@@ -135,20 +135,27 @@ if question := st.chat_input("Ask a question..."):
         full_response = ""
         sources = []
 
-        ws = websocket.WebSocket()
-        ws.connect(WS_URL)
-        ws.send(json.dumps({"userid": user_id, "question": question}))
+        try:
+            ws = websocket.WebSocket()
+            ws.connect(WS_URL)
+            ws.send(json.dumps({"userid": user_id, "question": question}))
 
-        while True:
-            msg = json.loads(ws.recv())
-            if msg["type"] == "chunk":
-                full_response += msg["content"]
-                placeholder.markdown(full_response + "▌")
-            elif msg["type"] == "sources":
-                sources = msg["content"]
-                break
+            while True:
+                msg = json.loads(ws.recv())
+                if msg["type"] == "chunk":
+                    full_response += msg["content"]
+                    placeholder.markdown(full_response + "▌")
+                elif msg["type"] == "sources":
+                    sources = msg["content"]
+                    break
+                elif msg["type"] == "error":
+                    placeholder.error(f"Server error: {msg['content']}")
+                    break
 
-        ws.close()
+            ws.close()
+        except Exception as e:
+            placeholder.error(f"Connection error: {e}")
+
         placeholder.markdown(full_response)
         if sources:
             st.caption("Sources: " + ", ".join(sources))

@@ -2,6 +2,7 @@ from langchain_postgres import PGVector
 from langchain_openai import OpenAIEmbeddings
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import text
+import asyncio
 import os
 
 _db_url = os.getenv("DATABASE_URL", "").replace("postgresql://", "postgresql+psycopg://", 1)
@@ -16,8 +17,15 @@ class VectorStore:
             use_jsonb=True,
         )
 
-    async def save_documents(self, chunks):
-        await self._store.aadd_documents(chunks)
+    async def save_documents(self, chunks, batch_size: int = 200, max_concurrent: int = 4):
+        batches = [chunks[i:i + batch_size] for i in range(0, len(chunks), batch_size)]
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def save_batch(batch):
+            async with semaphore:
+                await self._store.aadd_documents(batch)
+
+        await asyncio.gather(*[save_batch(b) for b in batches])
 
     async def delete_file(self, userid: str, file_name: str):
         async with _engine.begin() as conn:
