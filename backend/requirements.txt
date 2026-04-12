@@ -6,9 +6,13 @@ langchain
 langchain-community
 langchain-openai
 langchain-postgres
+langchain-text-splitters
+sqlalchemy
 psycopg2-binary
 psycopg[binary]
 python-dotenv
 pymupdf
 cryptography
 bcrypt
+ragas
+datasets

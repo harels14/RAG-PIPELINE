@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, UploadFile
 import uvicorn
 import logging
-from routes import document_route, user_route, rag_route
+from routes import document_route, user_route, rag_route, evaluation_route
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
@@ -19,6 +19,7 @@ def health_check():
 app.include_router(document_route.router)
 app.include_router(user_route.router)
 app.include_router(rag_route.router)
+app.include_router(evaluation_route.router)
 
 
 
