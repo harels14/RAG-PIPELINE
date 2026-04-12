@@ -1,20 +1,21 @@
 """
-RAG Evaluation Service using RAGAS.
+RAG Evaluation Service using RAGAS v0.2+.
 
 Metrics (no ground_truth needed):
-  - faithfulness:      Is the answer grounded in the retrieved context?
-  - answer_relevancy:  Is the answer relevant to the question?
-  - context_precision: Are the retrieved chunks actually relevant?
+  - faithfulness:                              Is the answer grounded in the retrieved context?
+  - answer_relevancy:                          Is the answer relevant to the question?
+  - llm_context_precision_without_reference:   Are the retrieved chunks actually relevant?
 
 Additional metrics (ground_truth required):
-  - context_recall:     Were all relevant chunks retrieved?
-  - answer_correctness: Is the answer factually correct?
+  - llm_context_precision_with_reference:  Context precision compared to reference
+  - llm_context_recall:                    Were all relevant chunks retrieved?
+  - answer_correctness:                    Is the answer factually correct?
 """
 
 import logging
 from typing import Optional
 
-from langchain_openai import ChatOpenAI
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
@@ -48,23 +49,33 @@ class EvaluationService:
         retriever_type: str = "semantic",
     ) -> dict:
         try:
-            from ragas import evaluate
+            from ragas import evaluate, EvaluationDataset, SingleTurnSample
+            from ragas.llms import LangchainLLMWrapper
+            from ragas.embeddings import LangchainEmbeddingsWrapper
             from ragas.metrics import (
-                faithfulness,
-                answer_relevancy,
+                Faithfulness,
+                AnswerRelevancy,
                 LLMContextPrecisionWithoutReference,
-                context_precision,
+                LLMContextPrecisionWithReference,
+                LLMContextRecall,
+                AnswerCorrectness,
             )
-            from datasets import Dataset
         except ImportError as e:
             raise RuntimeError(
-                "RAGAS or datasets not installed. Run: pip install ragas datasets"
+                "RAGAS not installed. Run: pip install ragas datasets"
             ) from e
 
         if ground_truths and len(ground_truths) != len(questions):
             raise ValueError("ground_truths must have the same length as questions")
 
-        rows = []
+        # Wrap LLM and embeddings for RAGAS
+        ragas_llm = LangchainLLMWrapper(ChatOpenAI(model="gpt-4o-mini"))
+        ragas_embeddings = LangchainEmbeddingsWrapper(
+            OpenAIEmbeddings(model="text-embedding-3-small")
+        )
+
+        # Build samples
+        samples = []
         for i, question in enumerate(questions):
             docs = (
                 self.rag.get_relevant_docs_hybrid(userid, question)
@@ -72,32 +83,53 @@ class EvaluationService:
                 else self.rag.get_relevant_docs(userid, question)
             )
             answer = self._generate_answer(docs, question)
-            row = {"question": question, "answer": answer, "contexts": [d.page_content for d in docs]}
-            if ground_truths:
-                row["reference"] = ground_truths[i]
-            rows.append(row)
-            logger.info("Evaluated question %d/%d", i + 1, len(questions))
 
-        dataset = Dataset.from_list(rows)
+            sample = SingleTurnSample(
+                user_input=question,
+                response=answer,
+                retrieved_contexts=[d.page_content for d in docs],
+                reference=ground_truths[i] if ground_truths else None,
+            )
+            samples.append(sample)
+            logger.info("Built sample %d/%d", i + 1, len(questions))
 
+        dataset = EvaluationDataset(samples=samples)
+
+        # Select metrics
         if ground_truths:
-            from ragas.metrics import context_recall, answer_correctness
-            metrics = [faithfulness, answer_relevancy, context_precision, context_recall, answer_correctness]
+            metrics = [
+                Faithfulness(llm=ragas_llm),
+                AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings),
+                LLMContextPrecisionWithReference(llm=ragas_llm),
+                LLMContextRecall(llm=ragas_llm),
+                AnswerCorrectness(llm=ragas_llm, embeddings=ragas_embeddings),
+            ]
         else:
-            metrics = [faithfulness, answer_relevancy, LLMContextPrecisionWithoutReference]
+            metrics = [
+                Faithfulness(llm=ragas_llm),
+                AnswerRelevancy(llm=ragas_llm, embeddings=ragas_embeddings),
+                LLMContextPrecisionWithoutReference(llm=ragas_llm),
+            ]
 
         result = evaluate(dataset, metrics=metrics)
-        scores = result.to_pandas()
+        scores_df = result.to_pandas()
         metric_names = [m.name for m in metrics]
-        aggregated = {name: round(float(scores[name].mean()), 4) for name in metric_names}
+
+        aggregated = {
+            name: round(float(scores_df[name].mean()), 4)
+            for name in metric_names
+        }
 
         per_question = []
-        for i, row in enumerate(rows):
+        for i, sample in enumerate(samples):
             per_question.append({
-                "question": row["question"],
-                "answer": row["answer"],
-                "num_contexts": len(row["contexts"]),
-                "scores": {name: round(float(scores[name].iloc[i]), 4) for name in metric_names},
+                "question": sample.user_input,
+                "answer": sample.response,
+                "num_contexts": len(sample.retrieved_contexts),
+                "scores": {
+                    name: round(float(scores_df[name].iloc[i]), 4)
+                    for name in metric_names
+                },
             })
 
         return {
@@ -115,7 +147,10 @@ class EvaluationService:
     ) -> dict:
         semantic = self.evaluate(userid, questions, ground_truths, retriever_type="semantic")
         hybrid = self.evaluate(userid, questions, ground_truths, retriever_type="hybrid")
-        delta = {k: round(hybrid["metrics"][k] - semantic["metrics"][k], 4) for k in semantic["metrics"]}
+        delta = {
+            k: round(hybrid["metrics"][k] - semantic["metrics"][k], 4)
+            for k in semantic["metrics"]
+        }
         return {
             "semantic": semantic["metrics"],
             "hybrid": hybrid["metrics"],
