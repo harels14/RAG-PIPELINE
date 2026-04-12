@@ -69,7 +69,8 @@ class RAGService:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-
+    # Not vulnerable to SQL injection: uses psycopg2 parameterized queries (%(name)s),
+    # so user input is passed as data — never interpolated into the SQL string itself.
     def _get_fts_docs(self, userid: str, query: str, k: int = 5) -> list[Document]:
         """
         Full-text search using PostgreSQL tsvector.
