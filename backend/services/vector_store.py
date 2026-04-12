@@ -17,13 +17,15 @@ class VectorStore:
             use_jsonb=True,
         )
 
-    async def save_documents(self, chunks, batch_size: int = 200, max_concurrent: int = 4):
-        batches = [chunks[i:i + batch_size] for i in range(0, len(chunks), batch_size)]
+    async def save_documents(self, chunks, embed_batch_size: int = 200, db_batch_size: int = 50, max_concurrent: int = 4):
+        # embed_batch_size: how many chunks per OpenAI API call (large = fewer calls)
+        # db_batch_size: how many rows per INSERT statement (small = avoids query size errors)
+        batches = [chunks[i:i + embed_batch_size] for i in range(0, len(chunks), embed_batch_size)]
         semaphore = asyncio.Semaphore(max_concurrent)
 
         async def save_batch(batch):
             async with semaphore:
-                await self._store.aadd_documents(batch)
+                await self._store.aadd_documents(batch, batch_size=db_batch_size)
 
         await asyncio.gather(*[save_batch(b) for b in batches])
 
